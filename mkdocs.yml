@@ -1,0 +1,20 @@
+site_name: Readdocs-LLM_PARL
+docs_dir: "."
+site_description: LLM-PARL
+repo_url: https://github.com/Luffy521-art/Readdocs-LLM_PARL   # 替换为你的实际地址
+repo_name: Readdocs-LLM_PARL
+
+theme:
+  name: material
+
+nav:
+  - 首页: index.md
+
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
