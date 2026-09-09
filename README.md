@@ -1,65 +1,81 @@
-<img width="415" height="226" alt="image" src="https://github.com/user-attachments/assets/884a4aee-e343-40ec-83a6-4b68a43f970d" />
+# LLM_PARL 项目自述文件 (README)
 
-<img width="764" height="1038" alt="image" src="https://github.com/user-attachments/assets/048a5b77-2d1a-45d5-8739-cbd3e9e32e78" />
+## 项目简介
 
-<img width="416" height="448" alt="image" src="https://github.com/user-attachments/assets/759af5c8-c7f2-4c8f-8a00-815dd767a314" />
+**LLM_PARL** 是一个面向 SUMO 路网 XML 生成任务的 PPO (Proximal Policy Optimization) 训练与进化实验项目。项目旨在通过大语言模型（主要使用 Qwen2.5 系列模型）自动生成、修改和优化交通仿真软件 SUMO 所需的路网 XML 配置文件（如节点文件、边文件及连接文件等），并通过外部评分器与强化学习不断迭代提升生成质量。
 
-初始化策略模型参数 θ、价值模型参数 φ、奖励模型参数 ψ
+---
 
-对每个外循环轮次 k = 1, 2, ... 执行：
+## 核心功能与流程
 
-读取当前训练批次的状态：
-    q_all = [q_1, q_2, ..., q_B]^T
+* **数据驱动的提示词机制**：支持从结构化 JSON 数据集（如 SUMO 路网分步任务数据）中读取 Prompt 和标准标签。
+* **多阶段大模型生成 (Rollout)**：利用 Qwen Actor 模型根据路网编辑需求自动生成对应的候选 XML 响应文本。
+* **多维度智能评分与奖励计算**：
+* 支持结合三维约束（结构完整性、边删除硬约束、计数对齐）的本地/外部评分器。
+* 支持通过 OpenAI 兼容的 Chat Completions API（如 DeepSeek 等异步打分服务）进行高并发质量评分。
 
-对当前批次执行 U 次 PPO 内循环：
-    对 q_b，b = 1, 2, ..., B 执行：
-        使用当前策略模型进行 rollout
-        生成 response_b
-        记录生成序列 sequences_b
-        记录动作掩码 action_mask_b
-        记录对数概率 log pi_θ(a_b | q_b)
 
-    组装当前一次 rollout 的完整样本：
-        D = {(q_b, response_b, sequences_b, action_mask_b)}_{b=1}^B
+* **PPO 强化学习对齐更新**：结合 Actor、Critic 以及 Reference Model，构建完整的 PPO 训练循环，对模型的 Token 级或轨迹级表现进行策略优化。
+* **PARL 奖励对齐框架**：引入基于 ModernBERT 的奖励模型（SUMORewardModel）及隐式梯度/Fisher 损失约束，实现更稳定高效的对齐训练。
+* **自动化监控与日志记录**：
+* 内置多卡 GPU 自动探测与守护启动脚本（支持显存轮询与容灾重启）。
+* 训练过程中自动写入评估指标 CSV、样本明细、Checkpoint 断点，并支持通过 Weights & Biases (W&B) 和 QQ 邮件进行监控提醒。
 
-    对每个样本计算稠密奖励：
-        对 sequences_b 做 teacher forcing
-        提取 hidden_states_b
-        将 hidden_states_b 输入奖励模型
-        得到 token 级奖励 r_b
 
-    根据 action_mask_b 对奖励进行对齐与截断：
-        得到 reward_b
 
-    构造 PPO 训练数据：
-        training_data = {(D_b, reward_b)}_{b=1}^B
+---
 
-    执行 PPO 更新：
-        θ, φ ← PPO_Update(θ, φ, training_data)
+## 项目代码结构
 
-重新采样 PARL 子批次：
-    选择一小部分训练样本 q_parl
-    使用最新策略模型重新 rollout
-    通过外部约束评分器得到监督标签 y_parl
+* `configs/`：训练、评分、数据路径等 YAML 配置文件。
+* `src/llm/`：包含 Qwen 模型的 Actor/Critic 架构、PPO 逻辑以及基于 ModernBERT 的奖励模型定义 (`qwen_module.py`, `reward_model.py`)。
+* `src/pipeline/`：核心训练步骤流水线，包括生成收集、奖励计算、PPO 数据构造以及 PARL 训练流程 (`runner_LLM_new.py`, `steps_LLM.py`, `steps_parl.py`)。
+* `src/metrics/`：外部 API 异步评分及规则校验逻辑。
+* `src/evolution/`：进化策略与种群接口。
+* `test/`：各类集成测试脚本、验证脚本以及日志分析工具。
+* `data/`：SUMO 任务相关的数据集文件。
 
-执行 PARL 隐式梯度更新：
-    对 q_parl 做 teacher forcing
-    提取 hidden_states_parl
-    计算直接监督损失：
-        L_direct = MSE(R_ψ(hidden_states_parl), y_parl)
+---
 
-    对 L_direct 进行反向传播并保留计算图
+## 快速上手与运行
 
-    基于策略输出和 action_mask 构造策略侧梯度方向
-    使用共轭梯度法近似求解二阶系统
-    得到隐式修正向量 v
+### 1. 环境准备
 
-    计算 reward_model 参数的隐式梯度修正项
-    叠加 L2 正则梯度：
-        L_reg = λ_l2 ||ψ||^2
+确保在 Linux 环境下，配置好 Python 3.10 及对应的虚拟环境（推荐项目已有的 `env_openrlhf` 运行环境），并安装 `requirements.txt` 中的基础依赖。
 
-    执行奖励模型参数更新：
-        ψ ← ψ - β · ∇ψ (L_direct + 隐式修正项 + L_reg)
+```bash
+# 激活环境
+conda activate /zjl/xmf/env_openrlhf
+cd /zjl/xmf/LLM_PARL
 
-使用更新后的奖励模型重新打分当前样本
-记录训练日志、loss 和奖励统计量
+# 安装依赖
+pip install -r requirements.txt
+
+```
+
+### 2. 设置环境变量
+
+配置项目根目录及评分器 API 密钥（以环境变量形式传入，避免写入配置文件）：
+
+```bash
+export MASDIFF_ROOT=/zjl/xmf
+export HF_ENDPOINT=https://hf-mirror.com
+export SCORER_API_KEY="你的评分器API密钥"
+
+```
+
+### 3. 启动训练
+
+可以通过通用配置文件直接运行主流程：
+
+```bash
+python run.py --config configs/default.yaml
+
+```
+
+或者使用自动多卡 GPU 守护启动脚本运行：
+
+```bash
+python auto_gpu_launcher.py
+
+```
