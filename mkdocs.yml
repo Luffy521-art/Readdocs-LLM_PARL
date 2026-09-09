@@ -8,7 +8,7 @@ theme:
   name: material
 
 nav:
-  - 首页: index.md
+  - 20260909: 20260909.md
 
 
 markdown_extensions:
