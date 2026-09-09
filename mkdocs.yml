@@ -1,5 +1,5 @@
 site_name: Readdocs-LLM_PARL
-docs_dir: "."
+docs_dir:  docs
 site_description: LLM-PARL
 repo_url: https://github.com/Luffy521-art/Readdocs-LLM_PARL   # 替换为你的实际地址
 repo_name: Readdocs-LLM_PARL
