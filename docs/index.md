@@ -4,6 +4,9 @@
 
 <img width="416" height="448" alt="image" src="https://github.com/user-attachments/assets/759af5c8-c7f2-4c8f-8a00-815dd767a314" />
 
+<br>
+
+```
 初始化策略模型参数 θ、价值模型参数 φ、奖励模型参数 ψ
 
 对每个外循环轮次 k = 1, 2, ... 执行：
@@ -63,4 +66,4 @@
 
 使用更新后的奖励模型重新打分当前样本
 记录训练日志、loss 和奖励统计量
-
+```
